@@ -1,12 +1,18 @@
+import speech_recognition as sr
+import os
 from langchain.llms import LlamaCpp
 from langchain import PromptTemplate, LLMChain
 from langchain.callbacks.manager import CallbackManager
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
-import speech_recognition as sr
-import os
 
+def get_user_input(prompt, valid_inputs):
+    while True:
+        user_input = input(prompt).lower()
+        if user_input in valid_inputs:
+            return user_input
+        else:
+            print(f"Invalid input. Please enter one of the following: {', '.join(valid_inputs)}")
 
-# Define a function to get voice input from the user
 def get_voice_input():
     print("Press Enter and then speak your question:")
     input()
@@ -27,58 +33,45 @@ def get_voice_input():
         print(f"Could not request results from Google Speech Recognition service; {e}")
         return None
 
-
-# Define a prompt template with a variable for the question and a placeholder for the answer
 template = """Question: {question}
 
-Answer: Let's think step by step."""
+Answer: """
 
-# Create a prompt object with the template and the input variable
 prompt = PromptTemplate(template=template, input_variables=["question"])
 
-# Create a callback manager to stream the output token by token
 callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
 
-# Create a LLaMA object with the model path and the callback manager
-# Make sure the model path is correct for your system!
+TEMP = float(os.environ.get("TEMP", 0.6))
+NCTX = os.environ.get("NCTX", 2500)
+
 llm = LlamaCpp(
-    model_path="/Users/oluwaseunolaoya/Documents/LLM_Models/ggml-model-q4_0.bin", 
-    callback_manager=callback_manager, 
+    model_path="/Users/oluwaseunolaoya/Documents/LLM_Models/ggml-gpt4all-l13b-snoozy.bin",
+    callback_manager=callback_manager,
     verbose=True,
+    temperature=TEMP,
+    n_ctx=NCTX,
+)
 
-    )
-
-# Create a LLMChain object with the prompt and the LLaMA object
 llm_chain = LLMChain(prompt=prompt, llm=llm)
 
-# Use a loop to get questions from the user and generate answers from LLaMA
+print("Welcome to the chatbot! You can ask questions by typing or speaking.")
+print("Type 'quit', 'exit', or 'stop' to end the session.")
+
 while True:
-    # Get a question from the user using voice input or keyboard input
-    question = get_voice_input() or input("Please type a question: ")
-    
-    # Break the loop if the user wants to quit
+    input_method = get_user_input("Would you like to type or speak your question? (type/speak): ", ["type", "speak"])
+
+    if input_method == "speak":
+        question = get_voice_input()
+        if not question:
+            continue
+    else:
+        question = input("Please type your question: ")
+
     if question.lower() in ["quit", "exit", "stop"]:
         break
-    
-    # Run the LLMChain object with the question and print the final output
+
     output = llm_chain.run(question)
 
-    # Sanitize the output string
     sanitized_output = output.replace("'", '"').replace("\n", " ").strip()
-    print(output)
-
-
-
-    # Use the sanitized output for text-to-speech
-    os.system("say '" + sanitized_output + "'")
-
-
-
-
-
-
-
-
-
-
     
+    #os.system("say '" + sanitized_output + "'")
